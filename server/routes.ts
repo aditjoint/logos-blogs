@@ -90,11 +90,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // ----- User Routes -----
+
+  // Get featured users (bloggers, admins)
+  app.get("/api/users/featured", async (req, res) => {
+    try {
+      // For now just return an empty array since we've not implemented this yet
+      return res.status(200).json([]);
+    } catch (error) {
+      console.error("Get featured users error:", error);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
   
   // Get user by ID
   app.get("/api/users/:id", async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
       const user = await storage.getUser(userId);
       
       if (!user) {
