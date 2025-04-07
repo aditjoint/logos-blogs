@@ -113,7 +113,7 @@ export default function Header() {
                 <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span className="ml-2 text-xl font-bold">Logus</span>
+              <span className="ml-2 text-xl font-bold">Logus Blogs</span>
             </Link>
             
             {/* Main nav - desktop */}
@@ -126,6 +126,11 @@ export default function Header() {
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Registered trademark */}
+            <span className="hidden md:inline-block text-xs text-gray-500 mr-2">
+              <sup>®</sup> Lalitendu
+            </span>
+            
             {/* Search button */}
             <form onSubmit={handleSearch} className="hidden sm:flex items-center">
               <div className="relative">
@@ -254,6 +259,11 @@ export default function Header() {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-xs text-gray-500">
+                <sup>®</sup> Lalitendu
+              </span>
+            </div>
             <nav className="flex flex-col space-y-4">
               <Link href="/" className="text-primary-600 dark:text-primary-500 font-medium">
                 Home
@@ -338,7 +348,7 @@ function LoginDialog({ open, onOpenChange, form, onSubmit, onRegisterClick }: Lo
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Login to Logus</DialogTitle>
+          <DialogTitle>Login to Logus Blogs</DialogTitle>
           <DialogDescription>
             Enter your credentials to access your account
           </DialogDescription>
@@ -409,7 +419,7 @@ function RegisterDialog({ open, onOpenChange, form, onSubmit, onLoginClick }: Re
         <DialogHeader>
           <DialogTitle>Create an account</DialogTitle>
           <DialogDescription>
-            Join Logus to start writing and sharing ideas
+            Join Logus Blogs to start writing and sharing ideas
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
