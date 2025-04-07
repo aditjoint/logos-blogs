@@ -7,11 +7,26 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { ArticleWithAuthor } from "@shared/schema";
 import { formatDate, truncateText } from "@/lib/utils";
 
+// Create a minimal type that only requires the properties we absolutely need
+interface ArticleProps {
+  id: number;
+  title: string;
+  excerpt?: string;
+  featuredImage?: string;
+  readingTime?: number;
+  createdAt?: string | Date;
+  tags?: Array<{id: number; name: string}>;
+  author?: {
+    id: number;
+    name: string;
+    avatar?: string;
+  };
+}
+
 interface ArticleCardProps {
-  article: ArticleWithAuthor;
+  article: ArticleProps;
   variant?: "compact" | "full";
 }
 
@@ -21,23 +36,25 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
   const queryClient = useQueryClient();
   const [isBookmarked, setIsBookmarked] = useState(false);
   
-  // Check if article is bookmarked
+  // Check if article is bookmarked only if authenticated and article has an id
   useEffect(() => {
-    if (isAuthenticated) {
-      fetch(`/api/bookmarks/${article.id}`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data && data.bookmarked) {
-            setIsBookmarked(data.bookmarked);
-          }
-        })
-        .catch(() => {}); // Silently fail
-    }
-  }, [isAuthenticated, article.id]);
+    if (!article?.id || !isAuthenticated) return;
+    
+    fetch(`/api/bookmarks/${article.id}`, { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.bookmarked === 'boolean') {
+          setIsBookmarked(data.bookmarked);
+        }
+      })
+      .catch(() => {}); // Silently fail
+  }, [isAuthenticated, article?.id]);
   
   // Toggle bookmark mutation
   const toggleBookmarkMutation = useMutation({
     mutationFn: async () => {
+      if (!article?.id) return false;
+      
       if (isBookmarked) {
         await apiRequest("DELETE", `/api/bookmarks/${article.id}`);
       } else {
@@ -48,7 +65,9 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
     onSuccess: (newBookmarkState) => {
       setIsBookmarked(newBookmarkState);
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${article.id}`] });
+      if (article?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${article.id}`] });
+      }
       
       toast({
         title: newBookmarkState ? "Article bookmarked" : "Bookmark removed",
@@ -82,6 +101,58 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
     toggleBookmarkMutation.mutate();
   };
 
+  // Author profile section
+  const renderAuthorSection = () => {
+    if (!article.author) {
+      return <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 mr-2" />;
+    }
+    
+    return (
+      <>
+        <Link href={`/profile/${article.author.id}`}>
+          <div className="w-6 h-6 rounded-full overflow-hidden mr-2">
+            {article.author.avatar ? (
+              <img 
+                src={article.author.avatar} 
+                alt={article.author.name || 'Author'} 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 text-xs">
+                {article.author.name ? article.author.name.charAt(0) : 'A'}
+              </div>
+            )}
+          </div>
+        </Link>
+        <Link href={`/profile/${article.author.id}`} className="text-sm text-gray-600 dark:text-gray-400">
+          {article.author.name || 'Anonymous'}
+        </Link>
+        <span className="mx-2 text-gray-400">·</span>
+      </>
+    );
+  };
+
+  // Tags section
+  const renderTags = (maxTags: number) => {
+    if (!article.tags || article.tags.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="flex space-x-2">
+        {article.tags.slice(0, maxTags).map((tag) => (
+          <Link 
+            key={tag.id} 
+            href={`/explore?tag=${tag.id}`}
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200"
+          >
+            {tag.name}
+          </Link>
+        ))}
+      </div>
+    );
+  };
+
   if (variant === "compact") {
     return (
       <Card className="article-card bg-white dark:bg-gray-800 overflow-hidden shadow-md hover:shadow-lg">
@@ -96,26 +167,10 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
         )}
         <CardContent className="p-5">
           <div className="flex items-center mb-3">
-            <Link href={`/profile/${article.author.id}`}>
-              <div className="w-6 h-6 rounded-full overflow-hidden mr-2">
-                {article.author.avatar ? (
-                  <img 
-                    src={article.author.avatar} 
-                    alt={article.author.name} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 text-xs">
-                    {article.author.name?.charAt(0)}
-                  </div>
-                )}
-              </div>
-            </Link>
-            <Link href={`/profile/${article.author.id}`} className="text-sm text-gray-600 dark:text-gray-400">
-              {article.author.name}
-            </Link>
-            <span className="mx-2 text-gray-400">·</span>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{article.readingTime} min read</span>
+            {renderAuthorSection()}
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {article.readingTime || 0} min read
+            </span>
           </div>
           <Link href={`/article/${article.id}`}>
             <h3 className="text-xl font-bold mb-2 line-clamp-2 hover:text-primary-600 transition-colors">
@@ -123,20 +178,10 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
             </h3>
           </Link>
           <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2 font-serif">
-            {article.excerpt}
+            {article.excerpt || ''}
           </p>
           <div className="flex items-center justify-between">
-            <div className="flex space-x-2">
-              {article.tags?.slice(0, 2).map((tag) => (
-                <Link 
-                  key={tag.id} 
-                  href={`/explore?tag=${tag.id}`}
-                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200"
-                >
-                  {tag.name}
-                </Link>
-              ))}
-            </div>
+            {renderTags(2)}
             <div className="flex text-gray-500 dark:text-gray-400">
               <Button
                 variant="ghost"
@@ -167,28 +212,18 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
       )}
       <div className={`p-5 ${article.featuredImage ? 'md:w-2/3' : 'w-full'}`}>
         <div className="flex items-center mb-3">
-          <Link href={`/profile/${article.author.id}`}>
-            <div className="w-6 h-6 rounded-full overflow-hidden mr-2">
-              {article.author.avatar ? (
-                <img 
-                  src={article.author.avatar} 
-                  alt={article.author.name} 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 text-xs">
-                  {article.author.name?.charAt(0)}
-                </div>
-              )}
-            </div>
-          </Link>
-          <Link href={`/profile/${article.author.id}`} className="text-sm text-gray-600 dark:text-gray-400">
-            {article.author.name}
-          </Link>
-          <span className="mx-2 text-gray-400">·</span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">{article.readingTime} min read</span>
-          <span className="mx-2 text-gray-400">·</span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">{formatDate(article.createdAt)}</span>
+          {renderAuthorSection()}
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {article.readingTime || 0} min read
+          </span>
+          {article.createdAt && (
+            <>
+              <span className="mx-2 text-gray-400">·</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {formatDate(article.createdAt)}
+              </span>
+            </>
+          )}
         </div>
         <Link href={`/article/${article.id}`}>
           <h3 className="text-xl font-bold mb-2 hover:text-primary-600 transition-colors">
@@ -196,20 +231,10 @@ export default function ArticleCard({ article, variant = "compact" }: ArticleCar
           </h3>
         </Link>
         <p className="text-gray-600 dark:text-gray-300 mb-4 font-serif">
-          {truncateText(article.excerpt, 200)}
+          {article.excerpt ? truncateText(article.excerpt, 200) : ''}
         </p>
         <div className="flex items-center justify-between">
-          <div className="flex space-x-2">
-            {article.tags?.slice(0, 3).map((tag) => (
-              <Link 
-                key={tag.id} 
-                href={`/explore?tag=${tag.id}`}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200"
-              >
-                {tag.name}
-              </Link>
-            ))}
-          </div>
+          {renderTags(3)}
           <div className="flex text-gray-500 dark:text-gray-400">
             <Button
               variant="ghost"

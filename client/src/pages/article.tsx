@@ -9,9 +9,27 @@ import CommentSection from "@/components/articles/comment-section";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, BookmarkIcon, Calendar, Clock, Edit, Heart, Share2 } from "lucide-react";
+import { AlertCircle, BookmarkIcon, Calendar, Clock, Edit, Share2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { ArticleWithAuthor } from "@shared/schema";
+
+// Define a minimal article type that only requires what we use
+interface SafeArticle {
+  id: number;
+  title: string;
+  content: string;
+  excerpt?: string;
+  featuredImage?: string;
+  readingTime?: number;
+  createdAt?: string | Date;
+  authorId?: number;
+  tags?: Array<{id: number; name: string}>;
+  author?: {
+    id: number;
+    name: string;
+    avatar?: string;
+    bio?: string;
+  };
+}
 
 export default function ArticlePage() {
   const [, params] = useRoute("/article/:id");
@@ -23,37 +41,37 @@ export default function ArticlePage() {
   const queryClient = useQueryClient();
 
   // Fetch article data
-  const { data: article, isLoading, error } = useQuery({
+  const { data: article, isLoading, error } = useQuery<SafeArticle>({
     queryKey: [`/api/articles/${articleId}`],
     enabled: !!articleId,
   });
 
   // Effect to check bookmark status
   useEffect(() => {
-    if (isAuthenticated && articleId) {
-      fetch(`/api/bookmarks/${articleId}`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data && data.bookmarked) {
-            setIsBookmarked(data.bookmarked);
-          }
-        })
-        .catch(() => {}); // Silently fail
-    }
+    if (!isAuthenticated || !articleId) return;
+    
+    fetch(`/api/bookmarks/${articleId}`, { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.bookmarked === 'boolean') {
+          setIsBookmarked(data.bookmarked);
+        }
+      })
+      .catch(() => {}); // Silently fail
   }, [isAuthenticated, articleId]);
 
   // Effect to check following status
   useEffect(() => {
-    if (isAuthenticated && article?.authorId) {
-      fetch(`/api/users/${article.authorId}/following`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data && data.following) {
-            setIsFollowing(data.following);
-          }
-        })
-        .catch(() => {}); // Silently fail
-    }
+    if (!isAuthenticated || !article?.authorId) return;
+    
+    fetch(`/api/users/${article.authorId}/following`, { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.following === 'boolean') {
+          setIsFollowing(data.following);
+        }
+      })
+      .catch(() => {}); // Silently fail
   }, [isAuthenticated, article?.authorId]);
 
   // Toggle bookmark mutation
@@ -90,7 +108,7 @@ export default function ArticlePage() {
   // Toggle follow mutation
   const toggleFollowMutation = useMutation({
     mutationFn: async () => {
-      if (!article) return false;
+      if (!article?.authorId) return false;
       
       if (isFollowing) {
         await apiRequest("DELETE", `/api/users/${article.authorId}/follow`);
@@ -104,13 +122,15 @@ export default function ArticlePage() {
     },
     onSuccess: (newFollowState) => {
       setIsFollowing(newFollowState);
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${article?.authorId}/following`] });
+      if (article?.authorId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/users/${article.authorId}/following`] });
+      }
       
       toast({
         title: newFollowState ? "Author followed" : "Author unfollowed",
         description: newFollowState 
-          ? `You are now following ${article?.author.name}` 
-          : `You have unfollowed ${article?.author.name}`,
+          ? `You are now following ${article?.author?.name || 'this author'}` 
+          : `You have unfollowed ${article?.author?.name || 'this author'}`,
       });
     },
     onError: () => {
@@ -198,10 +218,10 @@ export default function ArticlePage() {
 
   // Set page title
   useEffect(() => {
-    if (article) {
+    if (article?.title) {
       document.title = `${article.title} | Logus`;
     }
-  }, [article]);
+  }, [article?.title]);
 
   if (error) {
     return (
@@ -263,40 +283,48 @@ export default function ArticlePage() {
               <h1 className="text-3xl md:text-4xl font-bold mb-6">{article.title}</h1>
               
               <div className="flex flex-wrap items-center gap-4 mb-6">
-                <div className="flex items-center">
-                  <Avatar className="h-12 w-12 mr-3">
-                    <AvatarImage src={article.author.avatar || undefined} alt={article.author.name} />
-                    <AvatarFallback>
-                      {article.author.name?.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <Link href={`/profile/${article.authorId}`} className="font-medium hover:text-primary-600 transition-colors">
-                      {article.author.name}
-                    </Link>
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      <Button 
-                        variant={isFollowing ? "default" : "outline"} 
-                        size="sm" 
-                        className="h-7 text-xs"
-                        onClick={handleFollowToggle}
-                        disabled={toggleFollowMutation.isPending || user?.id === article.authorId}
-                      >
-                        {isFollowing ? "Following" : "Follow"}
-                      </Button>
+                {article.author && (
+                  <div className="flex items-center">
+                    <Avatar className="h-12 w-12 mr-3">
+                      <AvatarImage src={article.author.avatar || undefined} alt={article.author.name} />
+                      <AvatarFallback>
+                        {article.author.name?.charAt(0) || 'A'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      {article.authorId && (
+                        <Link href={`/profile/${article.authorId}`} className="font-medium hover:text-primary-600 transition-colors">
+                          {article.author.name}
+                        </Link>
+                      )}
+                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                        <Button 
+                          variant={isFollowing ? "default" : "outline"} 
+                          size="sm" 
+                          className="h-7 text-xs"
+                          onClick={handleFollowToggle}
+                          disabled={toggleFollowMutation.isPending || user?.id === article.authorId}
+                        >
+                          {isFollowing ? "Following" : "Follow"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="flex items-center ml-auto space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    <span>{formatDate(article.createdAt)}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    <span>{article.readingTime} min read</span>
-                  </div>
+                  {article.createdAt && (
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      <span>{formatDate(article.createdAt)}</span>
+                    </div>
+                  )}
+                  {article.readingTime && (
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span>{article.readingTime} min read</span>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -362,34 +390,36 @@ export default function ArticlePage() {
             </div>
 
             {/* Author bio */}
-            <div className="border-t border-b border-gray-200 dark:border-gray-700 py-6 mb-8">
-              <div className="flex items-start sm:items-center flex-col sm:flex-row gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={article.author.avatar || undefined} alt={article.author.name} />
-                  <AvatarFallback>
-                    {article.author.name?.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">Written by {article.author.name}</h3>
-                  {article.author.bio && (
-                    <p className="text-gray-600 dark:text-gray-300 mt-1">
-                      {article.author.bio}
-                    </p>
-                  )}
-                  {user?.id !== article.authorId && (
-                    <Button 
-                      className="mt-3" 
-                      variant={isFollowing ? "default" : "outline"}
-                      onClick={handleFollowToggle}
-                      disabled={toggleFollowMutation.isPending}
-                    >
-                      {isFollowing ? "Following" : "Follow Author"}
-                    </Button>
-                  )}
+            {article.author && (
+              <div className="border-t border-b border-gray-200 dark:border-gray-700 py-6 mb-8">
+                <div className="flex items-start sm:items-center flex-col sm:flex-row gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={article.author.avatar || undefined} alt={article.author.name} />
+                    <AvatarFallback>
+                      {article.author.name?.charAt(0) || 'A'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg">Written by {article.author.name}</h3>
+                    {article.author.bio && (
+                      <p className="text-gray-600 dark:text-gray-300 mt-1">
+                        {article.author.bio}
+                      </p>
+                    )}
+                    {user?.id !== article.authorId && (
+                      <Button 
+                        className="mt-3" 
+                        variant={isFollowing ? "default" : "outline"}
+                        onClick={handleFollowToggle}
+                        disabled={toggleFollowMutation.isPending}
+                      >
+                        {isFollowing ? "Following" : "Follow Author"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Comments Section */}
             <CommentSection articleId={article.id} />

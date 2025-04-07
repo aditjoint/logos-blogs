@@ -62,6 +62,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     next();
   };
+  
+  // Ensure user has admin role
+  const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+      return res.status(403).json({ message: "Admin privileges required" });
+    }
+    
+    next();
+  };
+  
+  // Ensure user has superadmin role
+  const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "superadmin") {
+      return res.status(403).json({ message: "Superadmin privileges required" });
+    }
+    
+    next();
+  };
+  
+  // Ensure user has blogger role or higher
+  const requireBloggerOrHigher = async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "blogger" && user.role !== "admin" && user.role !== "superadmin")) {
+      return res.status(403).json({ message: "Blogger privileges required" });
+    }
+    
+    next();
+  };
 
   // ===== API Routes =====
   // All routes are prefixed with /api

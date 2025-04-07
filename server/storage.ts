@@ -102,9 +102,110 @@ export class MemStorage implements IStorage {
       { name: "Self-Improvement", color: "#ef4444" }
     ];
 
+    // Create all tags
+    const tags: Tag[] = [];
     tagNames.forEach(tag => {
-      this.createTag({ name: tag.name, color: tag.color });
+      tags.push(this.createTag({ name: tag.name, color: tag.color }));
     });
+
+    // Create superadmin user
+    const superAdmin = this.createUser({
+      username: "superadmin",
+      password: "admin123",
+      email: "superadmin@example.com",
+      name: "Super Administrator",
+      role: "superadmin",
+      bio: "Platform Administrator with full access rights.",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create admin user
+    const admin = this.createUser({
+      username: "admin",
+      password: "admin123",
+      email: "admin@example.com",
+      name: "Admin User",
+      role: "admin",
+      bio: "Content Administrator with moderation rights.",
+      avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create blogger user
+    const blogger = this.createUser({
+      username: "blogger",
+      password: "blog123",
+      email: "blogger@example.com",
+      name: "Featured Blogger",
+      role: "blogger",
+      bio: "Professional writer with expanded platform privileges.",
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create regular user
+    const regularUser = this.createUser({
+      username: "user",
+      password: "user123",
+      email: "user@example.com",
+      name: "Regular User",
+      role: "user",
+      bio: "Standard platform user with basic permissions.",
+      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create demo user
+    const demoUser = this.createUser({
+      username: "demo",
+      password: "password",
+      email: "demo@example.com",
+      name: "Demo User",
+      role: "user",
+      bio: "This is a demo user for testing purposes.",
+      avatar: "https://images.unsplash.com/photo-1542740348-39501cd6e2b4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create articles
+    const article1 = this.createArticle({
+      title: "The Future of AI in Everyday Life",
+      content: "<h2>Introduction</h2><p>Artificial Intelligence has come a long way in recent years. From simple algorithms to complex neural networks, AI is transforming how we interact with technology.</p><h2>Current Applications</h2><p>Today, AI is already integrated into many aspects of our lives, from voice assistants to recommendation systems. These technologies are making our lives easier and more connected.</p><h2>Future Possibilities</h2><p>The future of AI holds even more promise. Autonomous vehicles, personalized medicine, and smart cities are just a few areas where AI will revolutionize our world.</p><h2>Ethical Considerations</h2><p>As AI becomes more advanced, we must consider the ethical implications. Privacy concerns, job displacement, and algorithm bias are challenges that need addressing.</p><h2>Conclusion</h2><p>AI has the potential to greatly improve our lives, but it requires thoughtful implementation and oversight. By focusing on human-centered AI, we can ensure that technology serves humanity's best interests.</p>",
+      excerpt: "Explore how artificial intelligence is reshaping our daily experiences and what the future might hold.",
+      authorId: blogger.id,
+      published: true,
+      readingTime: 8,
+      featuredImage: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+    });
+    
+    const article2 = this.createArticle({
+      title: "Healthy Habits for Remote Workers",
+      content: "<h2>Introduction</h2><p>Remote work has become increasingly common, offering flexibility but also presenting unique health challenges.</p><h2>Physical Health</h2><p>Maintaining physical health while working from home requires intentional effort. Regular exercise, ergonomic workspaces, and scheduled breaks can help prevent the negative effects of a sedentary lifestyle.</p><h2>Mental Well-being</h2><p>The isolation of remote work can impact mental health. Establishing boundaries between work and personal life, staying connected with colleagues, and practicing mindfulness are essential strategies.</p><h2>Nutrition Tips</h2><p>With constant access to the kitchen, healthy eating can be challenging. Meal planning, keeping nutritious snacks on hand, and maintaining regular meal times can support better nutrition.</p><h2>Conclusion</h2><p>By implementing these healthy habits, remote workers can thrive both professionally and personally. The key is finding sustainable practices that work for your individual circumstances.</p>",
+      excerpt: "Discover practical strategies to maintain physical and mental health while working remotely.",
+      authorId: admin.id,
+      published: true,
+      readingTime: 6,
+      featuredImage: "https://images.unsplash.com/photo-1549923746-c502d488b3ea?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+    });
+    
+    const article3 = this.createArticle({
+      title: "Essential Travel Tips for Budget Explorers",
+      content: "<h2>Introduction</h2><p>Traveling on a budget doesn't mean sacrificing experiences. With careful planning and insider knowledge, you can see the world without breaking the bank.</p><h2>Planning Your Trip</h2><p>The key to budget travel is advance planning. Researching destinations, tracking flight prices, and booking accommodations early can lead to significant savings.</p><h2>Accommodations</h2><p>Beyond traditional hotels, consider hostels, home-sharing platforms, or even house-sitting. These alternatives often provide unique experiences at lower costs.</p><h2>Transportation</h2><p>Public transportation, walking, or cycling are not only economical but also offer authentic ways to experience a destination. For longer distances, look into travel passes or budget airlines.</p><h2>Food and Dining</h2><p>Eating like a local is both culturally enriching and cost-effective. Visit markets, street food vendors, and restaurants away from tourist areas for the best value.</p><h2>Conclusion</h2><p>Budget travel is about prioritizing experiences over luxuries. With these tips, you can create meaningful travel memories without financial strain.</p>",
+      excerpt: "Learn how to explore the world on a limited budget without compromising on experiences.",
+      authorId: superAdmin.id,
+      published: true,
+      readingTime: 7,
+      featuredImage: "https://images.unsplash.com/photo-1503220317375-aaad61436b1b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+    });
+    
+    // Add tags to articles
+    this.addTagToArticle({ articleId: article1.id, tagId: tags[0].id }); // Technology
+    this.addTagToArticle({ articleId: article2.id, tagId: tags[6].id }); // Remote Work
+    this.addTagToArticle({ articleId: article3.id, tagId: tags[2].id }); // Writing
+    
+    console.log("Demo data initialized with users:");
+    console.log("- SuperAdmin:", superAdmin.username, "(Password: admin123)");
+    console.log("- Admin:", admin.username, "(Password: admin123)");
+    console.log("- Blogger:", blogger.username, "(Password: blog123)");
+    console.log("- Regular User:", regularUser.username, "(Password: user123)");
+    console.log("- Demo User:", demoUser.username, "(Password: password)");
+    console.log("Sample articles created with IDs:", article1.id, article2.id, article3.id);
   }
 
   // USER OPERATIONS
@@ -397,12 +498,20 @@ export class MemStorage implements IStorage {
   private attachArticleRelations(articles: Article[]): ArticleWithAuthor[] {
     return articles.map(article => {
       const author = this.usersData.get(article.authorId);
-      const tags = this.getArticleTags(article.id);
+      
+      // Get tags synchronously to avoid Promise issues
+      const tagIds = this.articleTagsData
+        .filter(at => at.articleId === article.id)
+        .map(at => at.tagId);
+      
+      const tags = tagIds
+        .map(id => this.tagsData.get(id))
+        .filter(Boolean) as Tag[];
       
       return {
         ...article,
         author: author!,
-        tags: []
+        tags: tags
       };
     });
   }
