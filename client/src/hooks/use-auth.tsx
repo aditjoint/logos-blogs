@@ -55,7 +55,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           throw new Error(res.statusText);
         }
         
-        return await res.json();
+        const text = await res.text();
+        
+        // Check if response is empty
+        if (!text) {
+          return null;
+        }
+        
+        try {
+          return JSON.parse(text);
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError, 'Raw response:', text);
+          return null;
+        }
       } catch (error) {
         console.error('Auth fetch error:', error);
         return null;
@@ -71,10 +83,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const res = await apiRequest('POST', '/api/login', credentials);
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'Login failed');
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || 'Login failed');
+          } catch (jsonError) {
+            throw new Error('Login failed - server error');
+          }
         }
-        return res.json();
+        
+        const text = await res.text();
+        if (!text) {
+          throw new Error('Empty response from server');
+        }
+        
+        try {
+          return JSON.parse(text);
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError, 'Raw response:', text);
+          throw new Error('Invalid response format from server');
+        }
       } catch (error) {
         console.error('Login error:', error);
         throw error;
@@ -102,10 +129,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const res = await apiRequest('POST', '/api/register', userData);
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'Registration failed');
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || 'Registration failed');
+          } catch (jsonError) {
+            throw new Error('Registration failed - server error');
+          }
         }
-        return res.json();
+        
+        const text = await res.text();
+        if (!text) {
+          throw new Error('Empty response from server');
+        }
+        
+        try {
+          return JSON.parse(text);
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError, 'Raw response:', text);
+          throw new Error('Invalid response format from server');
+        }
       } catch (error) {
         console.error('Registration error:', error);
         throw error;
@@ -133,10 +175,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const res = await apiRequest('POST', '/api/logout', {});
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'Logout failed');
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || 'Logout failed');
+          } catch (jsonError) {
+            throw new Error('Logout failed - server error');
+          }
         }
-        return true; // Successfully logged out
+        // Successfully logged out
+        return true;
       } catch (error) {
         console.error('Logout error:', error);
         throw error;
