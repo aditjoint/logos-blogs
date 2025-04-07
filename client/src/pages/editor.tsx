@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle, Save, Image as ImageIcon, Tags } from "lucide-react";
-import { createExcerpt, calculateReadingTime } from "@/lib/utils";
+import { createExcerpt, calculateReadingTime, htmlToPlainText } from "@/lib/utils";
 import { ArticleWithAuthor, Tag } from "@shared/schema";
 
 export default function EditorPage() {
@@ -136,12 +136,15 @@ export default function EditorPage() {
       return;
     }
 
+    // Ensure we have valid text content for calculating reading time
+    const textContent = content.text || htmlToPlainText(content.html);
+    
     const articleData = {
       title: title.trim(),
       content: content.html,
       excerpt: createExcerpt(content.html, 150),
       featuredImage: featuredImage || undefined,
-      readingTime: calculateReadingTime(content.text || content.html),
+      readingTime: calculateReadingTime(textContent),
       published: shouldPublish,
     };
 
@@ -162,7 +165,7 @@ export default function EditorPage() {
 
   // Set page title
   useEffect(() => {
-    document.title = articleId ? "Edit Article | Logus" : "Write New Article | Logus";
+    document.title = articleId ? "Edit Article | Logos Blogs" : "Write New Article | Logos Blogs";
   }, [articleId]);
 
   // Check if user can edit this article
@@ -217,7 +220,7 @@ export default function EditorPage() {
                   <DialogHeader>
                     <DialogTitle>Publish Article</DialogTitle>
                     <DialogDescription>
-                      Your article will be visible to all Logus users.
+                      Your article will be visible to all Logos Blogs users.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-3">

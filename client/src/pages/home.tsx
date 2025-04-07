@@ -8,7 +8,7 @@ import { Link } from "wouter";
 export default function Home() {
   // Set page title
   useEffect(() => {
-    document.title = "Logus - Where good ideas find you";
+    document.title = "Logos Blogs - Where good ideas find you";
   }, []);
 
   return (
@@ -21,7 +21,7 @@ export default function Home() {
               Where good ideas find you
             </h1>
             <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8">
-              Read and share ideas from independent voices, world-class publications, and experts from around the globe. Anyone can publish on Logus.
+              Read and share ideas from independent voices, world-class publications, and experts from around the globe. Anyone can publish on Logos Blogs.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Link href="/editor">

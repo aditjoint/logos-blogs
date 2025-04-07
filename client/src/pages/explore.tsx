@@ -47,10 +47,10 @@ export default function Explore() {
   // Set page title
   useEffect(() => {
     document.title = searchQuery 
-      ? `Search: ${searchQuery} | Logus` 
+      ? `Search: ${searchQuery} | Logos Blogs` 
       : selectedTag && tags?.find(t => t.id === selectedTag)
-        ? `${tags.find(t => t.id === selectedTag)?.name} Articles | Logus`
-        : "Explore | Logus";
+        ? `${tags.find(t => t.id === selectedTag)?.name} Articles | Logos Blogs`
+        : "Explore | Logos Blogs";
   }, [searchQuery, selectedTag, tags]);
 
   const handleSearch = (e: React.FormEvent) => {
