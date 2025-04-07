@@ -121,7 +121,7 @@ export default function Header() {
               <NavLink href="/" active={location === "/"}>Home</NavLink>
               <NavLink href="/explore" active={location.startsWith("/explore")}>Explore</NavLink>
               <NavLink href="/bookmarks" active={location === "/bookmarks"}>Bookmarks</NavLink>
-              <NavLink href="/tags" active={location === "/tags"}>Topics</NavLink>
+              <NavLink href="/topics" active={location === "/topics"}>Topics</NavLink>
             </nav>
           </div>
           
@@ -264,7 +264,7 @@ export default function Header() {
               <Link href="/bookmarks" className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
                 Bookmarks
               </Link>
-              <Link href="/tags" className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
+              <Link href="/topics" className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
                 Topics
               </Link>
             </nav>

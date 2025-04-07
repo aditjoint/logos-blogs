@@ -10,6 +10,7 @@ import Editor from "@/pages/editor";
 import Profile from "@/pages/profile";
 import Explore from "@/pages/explore";
 import Bookmarks from "@/pages/bookmarks";
+import Topics from "@/pages/topics";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 
@@ -26,6 +27,7 @@ function Router() {
           <Route path="/profile/:id" component={Profile} />
           <Route path="/explore" component={Explore} />
           <Route path="/bookmarks" component={Bookmarks} />
+          <Route path="/topics" component={Topics} />
           <Route component={NotFound} />
         </Switch>
       </main>
