@@ -12,7 +12,7 @@ export default function Footer() {
                 <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span className="ml-2 text-xl font-bold">Logus</span>
+              <span className="ml-2 text-xl font-bold">Logos</span>
             </div>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Share ideas that matter and find the audience they deserve.
@@ -74,7 +74,7 @@ export default function Footer() {
             </a>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            &copy; 2023 Logus. All rights reserved.
+            &copy; 2023 Logos. All rights reserved.
           </p>
         </div>
       </div>
