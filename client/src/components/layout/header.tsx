@@ -113,7 +113,7 @@ export default function Header() {
                 <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span className="ml-2 text-xl font-bold">Logus Blogs</span>
+              <span className="ml-2 text-xl font-bold">Logos Blogs</span>
             </Link>
             
             {/* Main nav - desktop */}
@@ -348,7 +348,7 @@ function LoginDialog({ open, onOpenChange, form, onSubmit, onRegisterClick }: Lo
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Login to Logus Blogs</DialogTitle>
+          <DialogTitle>Login to Logos Blogs</DialogTitle>
           <DialogDescription>
             Enter your credentials to access your account
           </DialogDescription>
@@ -419,7 +419,7 @@ function RegisterDialog({ open, onOpenChange, form, onSubmit, onLoginClick }: Re
         <DialogHeader>
           <DialogTitle>Create an account</DialogTitle>
           <DialogDescription>
-            Join Logus Blogs to start writing and sharing ideas
+            Join Logos Blogs to start writing and sharing ideas
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
