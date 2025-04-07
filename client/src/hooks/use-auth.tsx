@@ -41,15 +41,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Fetch current user data
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ['/api/auth/me'],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async ({ queryKey }) => {
+      try {
+        const res = await fetch(queryKey[0] as string, {
+          credentials: "include",
+        });
+        
+        if (res.status === 401) {
+          return null;
+        }
+        
+        if (!res.ok) {
+          throw new Error(res.statusText);
+        }
+        
+        return await res.json();
+      } catch (error) {
+        console.error('Auth fetch error:', error);
+        return null;
+      }
+    },
     retry: false,
   });
 
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
-      const res = await apiRequest('POST', '/api/auth/login', credentials);
-      return res.json();
+      try {
+        const res = await apiRequest('POST', '/api/auth/login', credentials);
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || 'Login failed');
+        }
+        return res.json();
+      } catch (error) {
+        console.error('Login error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['/api/auth/me'], data);
@@ -70,8 +98,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Register mutation
   const registerMutation = useMutation({
     mutationFn: async (userData: RegisterData) => {
-      const res = await apiRequest('POST', '/api/auth/register', userData);
-      return res.json();
+      try {
+        const res = await apiRequest('POST', '/api/auth/register', userData);
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || 'Registration failed');
+        }
+        return res.json();
+      } catch (error) {
+        console.error('Registration error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['/api/auth/me'], data);
@@ -92,8 +129,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/auth/logout', {});
-      return res.json();
+      try {
+        const res = await apiRequest('POST', '/api/auth/logout', {});
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || 'Logout failed');
+        }
+        return res.json();
+      } catch (error) {
+        console.error('Logout error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.setQueryData(['/api/auth/me'], null);
@@ -127,7 +173,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: user || null,
         isLoading,
         isAuthenticated: !!user,
         login,
@@ -148,29 +194,4 @@ export function useAuth() {
   return context;
 }
 
-// Helper function for auth queries
-function getQueryFn<T>({ on401 }: { on401: "returnNull" | "throw" }) {
-  return async ({ queryKey }: { queryKey: string[] }): Promise<T | null> => {
-    try {
-      const res = await fetch(queryKey[0], {
-        credentials: "include",
-      });
 
-      if (on401 === "returnNull" && res.status === 401) {
-        return null;
-      }
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
-      }
-
-      return await res.json();
-    } catch (error) {
-      if (on401 === "returnNull") {
-        return null;
-      }
-      throw error;
-    }
-  };
-}
