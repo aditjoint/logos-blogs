@@ -62,12 +62,24 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
+        if (!user) {
           return done(null, false, { message: "Invalid username or password" });
-        } else {
+        }
+        
+        // Check for plain text password (demo accounts)
+        if (user.password === password) {
+          console.log("Login with demo account:", username);
           return done(null, user);
         }
+        
+        // Check for hashed password
+        if (user.password.includes('.') && await comparePasswords(password, user.password)) {
+          return done(null, user);
+        }
+        
+        return done(null, false, { message: "Invalid username or password" });
       } catch (err) {
+        console.error("Authentication error:", err);
         return done(err);
       }
     }),
