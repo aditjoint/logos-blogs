@@ -551,4 +551,582 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// DatabaseStorage implementation
+import { db } from "./db";
+import { eq, and, desc, ilike, sql, asc, or, isNull } from "drizzle-orm";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { Pool } from "@neondatabase/serverless";
+
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+  
+  constructor() {
+    const PostgresStore = connectPg(session);
+    this.sessionStore = new PostgresStore({
+      pool: new Pool({ connectionString: process.env.DATABASE_URL }),
+      createTableIfMissing: true 
+    });
+    
+    // Initialize data (for development)
+    this.initializeData().catch(err => console.error("Error initializing data:", err));
+  }
+  
+  async initializeData() {
+    // Check if we already have users
+    const existingUsers = await db.select().from(users).limit(1);
+    if (existingUsers.length > 0) {
+      console.log("Data already initialized, skipping...");
+      return;
+    }
+    
+    console.log("Initializing database with sample data...");
+    
+    // Create default tags
+    const tagNames = [
+      { name: "Technology", color: "#3b82f6" },
+      { name: "Productivity", color: "#6366f1" },
+      { name: "Writing", color: "#8b5cf6" },
+      { name: "Psychology", color: "#ec4899" },
+      { name: "Leadership", color: "#10b981" },
+      { name: "Design", color: "#f59e0b" },
+      { name: "Remote Work", color: "#6b7280" },
+      { name: "Self-Improvement", color: "#ef4444" }
+    ];
+
+    // Create all tags
+    const tags: Tag[] = [];
+    for (const tag of tagNames) {
+      tags.push(await this.createTag({ name: tag.name, color: tag.color }));
+    }
+
+    // Create superadmin user
+    const superAdmin = await this.createUser({
+      username: "superadmin",
+      password: "admin123",
+      email: "superadmin@example.com",
+      name: "Super Administrator",
+      role: "superadmin",
+      bio: "Platform Administrator with full access rights.",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create admin user
+    const admin = await this.createUser({
+      username: "admin",
+      password: "admin123",
+      email: "admin@example.com",
+      name: "Admin User",
+      role: "admin",
+      bio: "Content Administrator with moderation rights.",
+      avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create blogger user
+    const blogger = await this.createUser({
+      username: "blogger",
+      password: "blog123",
+      email: "blogger@example.com",
+      name: "Featured Blogger",
+      role: "blogger",
+      bio: "Professional writer with expanded platform privileges.",
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create regular user
+    const regularUser = await this.createUser({
+      username: "user",
+      password: "user123",
+      email: "user@example.com",
+      name: "Regular User",
+      role: "user",
+      bio: "Standard platform user with basic permissions.",
+      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create demo user
+    const demoUser = await this.createUser({
+      username: "demo",
+      password: "password",
+      email: "demo@example.com",
+      name: "Demo User",
+      role: "user",
+      bio: "This is a demo user for testing purposes.",
+      avatar: "https://images.unsplash.com/photo-1542740348-39501cd6e2b4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=150&q=80"
+    });
+    
+    // Create articles
+    const article1 = await this.createArticle({
+      title: "The Future of AI in Everyday Life",
+      content: "<h2>Introduction</h2><p>Artificial Intelligence has come a long way in recent years. From simple algorithms to complex neural networks, AI is transforming how we interact with technology.</p><h2>Current Applications</h2><p>Today, AI is already integrated into many aspects of our lives, from voice assistants to recommendation systems. These technologies are making our lives easier and more connected.</p><h2>Future Possibilities</h2><p>The future of AI holds even more promise. Autonomous vehicles, personalized medicine, and smart cities are just a few areas where AI will revolutionize our world.</p><h2>Ethical Considerations</h2><p>As AI becomes more advanced, we must consider the ethical implications. Privacy concerns, job displacement, and algorithm bias are challenges that need addressing.</p><h2>Conclusion</h2><p>AI has the potential to greatly improve our lives, but it requires thoughtful implementation and oversight. By focusing on human-centered AI, we can ensure that technology serves humanity's best interests.</p>",
+      excerpt: "Explore how artificial intelligence is reshaping our daily experiences and what the future might hold.",
+      authorId: blogger.id,
+      published: true,
+      readingTime: 8,
+      featuredImage: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+    });
+    
+    const article2 = await this.createArticle({
+      title: "Healthy Habits for Remote Workers",
+      content: "<h2>Introduction</h2><p>Remote work has become increasingly common, offering flexibility but also presenting unique health challenges.</p><h2>Physical Health</h2><p>Maintaining physical health while working from home requires intentional effort. Regular exercise, ergonomic workspaces, and scheduled breaks can help prevent the negative effects of a sedentary lifestyle.</p><h2>Mental Well-being</h2><p>The isolation of remote work can impact mental health. Establishing boundaries between work and personal life, staying connected with colleagues, and practicing mindfulness are essential strategies.</p><h2>Nutrition Tips</h2><p>With constant access to the kitchen, healthy eating can be challenging. Meal planning, keeping nutritious snacks on hand, and maintaining regular meal times can support better nutrition.</p><h2>Conclusion</h2><p>By implementing these healthy habits, remote workers can thrive both professionally and personally. The key is finding sustainable practices that work for your individual circumstances.</p>",
+      excerpt: "Discover practical strategies to maintain physical and mental health while working remotely.",
+      authorId: admin.id,
+      published: true,
+      readingTime: 6,
+      featuredImage: "https://images.unsplash.com/photo-1549923746-c502d488b3ea?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+    });
+    
+    const article3 = await this.createArticle({
+      title: "Essential Travel Tips for Budget Explorers",
+      content: "<h2>Introduction</h2><p>Traveling on a budget doesn't mean sacrificing experiences. With careful planning and insider knowledge, you can see the world without breaking the bank.</p><h2>Planning Your Trip</h2><p>The key to budget travel is advance planning. Researching destinations, tracking flight prices, and booking accommodations early can lead to significant savings.</p><h2>Accommodations</h2><p>Beyond traditional hotels, consider hostels, home-sharing platforms, or even house-sitting. These alternatives often provide unique experiences at lower costs.</p><h2>Transportation</h2><p>Public transportation, walking, or cycling are not only economical but also offer authentic ways to experience a destination. For longer distances, look into travel passes or budget airlines.</p><h2>Food and Dining</h2><p>Eating like a local is both culturally enriching and cost-effective. Visit markets, street food vendors, and restaurants away from tourist areas for the best value.</p><h2>Conclusion</h2><p>Budget travel is about prioritizing experiences over luxuries. With these tips, you can create meaningful travel memories without financial strain.</p>",
+      excerpt: "Learn how to explore the world on a limited budget without compromising on experiences.",
+      authorId: superAdmin.id,
+      published: true,
+      readingTime: 7,
+      featuredImage: "https://images.unsplash.com/photo-1503220317375-aaad61436b1b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+    });
+    
+    // Add tags to articles
+    await this.addTagToArticle({ articleId: article1.id, tagId: tags[0].id }); // Technology
+    await this.addTagToArticle({ articleId: article2.id, tagId: tags[6].id }); // Remote Work
+    await this.addTagToArticle({ articleId: article3.id, tagId: tags[2].id }); // Writing
+    
+    console.log("Demo data initialized with users:");
+    console.log("- SuperAdmin:", superAdmin.username, "(Password: admin123)");
+    console.log("- Admin:", admin.username, "(Password: admin123)");
+    console.log("- Blogger:", blogger.username, "(Password: blog123)");
+    console.log("- Regular User:", regularUser.username, "(Password: user123)");
+    console.log("- Demo User:", demoUser.username, "(Password: password)");
+    console.log("Sample articles created with IDs:", article1.id, article2.id, article3.id);
+  }
+
+  // USER OPERATIONS
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(sql`LOWER(${users.username})`, username.toLowerCase()));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  // ARTICLE OPERATIONS
+  async getArticles(limit = 10, offset = 0): Promise<ArticleWithAuthor[]> {
+    const articlesData = await db
+      .select()
+      .from(articles)
+      .where(eq(articles.published, true))
+      .orderBy(desc(articles.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    return await this.attachArticleRelations(articlesData);
+  }
+
+  async getArticleById(id: number): Promise<ArticleWithAuthor | undefined> {
+    const [article] = await db.select().from(articles).where(eq(articles.id, id));
+    if (!article) return undefined;
+    
+    const [articleWithRelations] = await this.attachArticleRelations([article]);
+    return articleWithRelations;
+  }
+
+  async getArticlesByAuthor(authorId: number): Promise<ArticleWithAuthor[]> {
+    const articlesData = await db
+      .select()
+      .from(articles)
+      .where(eq(articles.authorId, authorId))
+      .orderBy(desc(articles.createdAt));
+    
+    return await this.attachArticleRelations(articlesData);
+  }
+
+  async getArticlesByTag(tagId: number): Promise<ArticleWithAuthor[]> {
+    const articlesWithTag = await db
+      .select({
+        articleId: articleTags.articleId,
+      })
+      .from(articleTags)
+      .where(eq(articleTags.tagId, tagId));
+    
+    const articleIds = articlesWithTag.map(at => at.articleId);
+    
+    if (articleIds.length === 0) return [];
+    
+    const articlesList = articleIds.join(',');
+    const articlesData = await db
+      .select()
+      .from(articles)
+      .where(and(
+        sql`${articles.id} IN (${articlesList})`,
+        eq(articles.published, true)
+      ))
+      .orderBy(desc(articles.createdAt));
+    
+    return await this.attachArticleRelations(articlesData);
+  }
+
+  async getTrendingArticles(limit = 4): Promise<ArticleWithAuthor[]> {
+    // For now, just return the most recent articles
+    return this.getArticles(limit);
+  }
+
+  async createArticle(article: InsertArticle): Promise<Article> {
+    const [newArticle] = await db.insert(articles).values(article).returning();
+    return newArticle;
+  }
+
+  async updateArticle(id: number, article: Partial<InsertArticle>): Promise<Article | undefined> {
+    const [updatedArticle] = await db
+      .update(articles)
+      .set({ ...article, updatedAt: new Date() })
+      .where(eq(articles.id, id))
+      .returning();
+    
+    return updatedArticle;
+  }
+
+  async deleteArticle(id: number): Promise<boolean> {
+    // Delete article tags
+    await db.delete(articleTags).where(eq(articleTags.articleId, id));
+    
+    // Delete article comments
+    await db.delete(comments).where(eq(comments.articleId, id));
+    
+    // Delete article bookmarks
+    await db.delete(bookmarks).where(eq(bookmarks.articleId, id));
+    
+    // Delete article
+    const result = await db.delete(articles).where(eq(articles.id, id));
+    return result.count > 0;
+  }
+
+  async searchArticles(query: string): Promise<ArticleWithAuthor[]> {
+    const searchTerm = `%${query}%`;
+    
+    const articlesData = await db
+      .select()
+      .from(articles)
+      .where(and(
+        eq(articles.published, true),
+        or(
+          ilike(articles.title, searchTerm),
+          ilike(articles.content, searchTerm),
+          ilike(articles.excerpt, searchTerm)
+        )
+      ))
+      .orderBy(desc(articles.createdAt));
+    
+    return await this.attachArticleRelations(articlesData);
+  }
+
+  // TAG OPERATIONS
+  async getAllTags(): Promise<Tag[]> {
+    return await db.select().from(tags);
+  }
+
+  async getTagById(id: number): Promise<Tag | undefined> {
+    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    return tag;
+  }
+
+  async getTagByName(name: string): Promise<Tag | undefined> {
+    const [tag] = await db
+      .select()
+      .from(tags)
+      .where(eq(sql`LOWER(${tags.name})`, name.toLowerCase()));
+    return tag;
+  }
+
+  async createTag(tag: InsertTag): Promise<Tag> {
+    const [newTag] = await db.insert(tags).values(tag).returning();
+    return newTag;
+  }
+
+  async getArticleTags(articleId: number): Promise<Tag[]> {
+    const tagsForArticle = await db
+      .select({
+        tagId: articleTags.tagId,
+      })
+      .from(articleTags)
+      .where(eq(articleTags.articleId, articleId));
+    
+    const tagIds = tagsForArticle.map(t => t.tagId);
+    
+    if (tagIds.length === 0) return [];
+    
+    const tagsList = tagIds.join(',');
+    return await db
+      .select()
+      .from(tags)
+      .where(sql`${tags.id} IN (${tagsList})`);
+  }
+
+  async addTagToArticle(articleTag: InsertArticleTag): Promise<ArticleTag> {
+    // Check if already exists
+    const [existing] = await db
+      .select()
+      .from(articleTags)
+      .where(and(
+        eq(articleTags.articleId, articleTag.articleId),
+        eq(articleTags.tagId, articleTag.tagId)
+      ));
+    
+    if (existing) return existing;
+    
+    await db.insert(articleTags).values(articleTag);
+    return articleTag;
+  }
+
+  async removeTagFromArticle(articleId: number, tagId: number): Promise<boolean> {
+    const result = await db
+      .delete(articleTags)
+      .where(and(
+        eq(articleTags.articleId, articleId),
+        eq(articleTags.tagId, tagId)
+      ));
+    
+    return result.count > 0;
+  }
+
+  // COMMENT OPERATIONS
+  async getArticleComments(articleId: number): Promise<CommentWithAuthor[]> {
+    const commentsData = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.articleId, articleId))
+      .orderBy(asc(comments.createdAt));
+    
+    return await this.buildCommentTree(commentsData);
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    const [newComment] = await db.insert(comments).values(comment).returning();
+    return newComment;
+  }
+
+  async deleteComment(id: number): Promise<boolean> {
+    // Delete child comments recursively
+    const childComments = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.parentId, id));
+    
+    for (const child of childComments) {
+      await this.deleteComment(child.id);
+    }
+    
+    // Delete the comment
+    const result = await db.delete(comments).where(eq(comments.id, id));
+    return result.count > 0;
+  }
+
+  // BOOKMARK OPERATIONS
+  async getUserBookmarks(userId: number): Promise<ArticleWithAuthor[]> {
+    const bookmarkedArticles = await db
+      .select({
+        articleId: bookmarks.articleId,
+      })
+      .from(bookmarks)
+      .where(eq(bookmarks.userId, userId));
+    
+    const articleIds = bookmarkedArticles.map(b => b.articleId);
+    
+    if (articleIds.length === 0) return [];
+    
+    const articlesList = articleIds.join(',');
+    const articlesData = await db
+      .select()
+      .from(articles)
+      .where(sql`${articles.id} IN (${articlesList})`)
+      .orderBy(desc(articles.createdAt));
+    
+    return await this.attachArticleRelations(articlesData);
+  }
+
+  async addBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
+    // Check if already exists
+    const [existing] = await db
+      .select()
+      .from(bookmarks)
+      .where(and(
+        eq(bookmarks.userId, bookmark.userId),
+        eq(bookmarks.articleId, bookmark.articleId)
+      ));
+    
+    if (existing) return existing;
+    
+    const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
+    return newBookmark;
+  }
+
+  async removeBookmark(userId: number, articleId: number): Promise<boolean> {
+    const result = await db
+      .delete(bookmarks)
+      .where(and(
+        eq(bookmarks.userId, userId),
+        eq(bookmarks.articleId, articleId)
+      ));
+    
+    return result.count > 0;
+  }
+
+  async isBookmarked(userId: number, articleId: number): Promise<boolean> {
+    const [bookmark] = await db
+      .select()
+      .from(bookmarks)
+      .where(and(
+        eq(bookmarks.userId, userId),
+        eq(bookmarks.articleId, articleId)
+      ));
+    
+    return !!bookmark;
+  }
+
+  // FOLLOW OPERATIONS
+  async followUser(follow: InsertFollow): Promise<Follow> {
+    // Check if already exists
+    const [existing] = await db
+      .select()
+      .from(follows)
+      .where(and(
+        eq(follows.followerId, follow.followerId),
+        eq(follows.followingId, follow.followingId)
+      ));
+    
+    if (existing) return existing;
+    
+    const [newFollow] = await db.insert(follows).values(follow).returning();
+    return newFollow;
+  }
+
+  async unfollowUser(followerId: number, followingId: number): Promise<boolean> {
+    const result = await db
+      .delete(follows)
+      .where(and(
+        eq(follows.followerId, followerId),
+        eq(follows.followingId, followingId)
+      ));
+    
+    return result.count > 0;
+  }
+
+  async getFollowers(userId: number): Promise<User[]> {
+    const followersData = await db
+      .select({
+        followerId: follows.followerId,
+      })
+      .from(follows)
+      .where(eq(follows.followingId, userId));
+    
+    const followerIds = followersData.map(f => f.followerId);
+    
+    if (followerIds.length === 0) return [];
+    
+    const followersList = followerIds.join(',');
+    return await db
+      .select()
+      .from(users)
+      .where(sql`${users.id} IN (${followersList})`);
+  }
+
+  async getFollowing(userId: number): Promise<User[]> {
+    const followingData = await db
+      .select({
+        followingId: follows.followingId,
+      })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+    
+    const followingIds = followingData.map(f => f.followingId);
+    
+    if (followingIds.length === 0) return [];
+    
+    const followingList = followingIds.join(',');
+    return await db
+      .select()
+      .from(users)
+      .where(sql`${users.id} IN (${followingList})`);
+  }
+
+  async isFollowing(followerId: number, followingId: number): Promise<boolean> {
+    const [follow] = await db
+      .select()
+      .from(follows)
+      .where(and(
+        eq(follows.followerId, followerId),
+        eq(follows.followingId, followingId)
+      ));
+    
+    return !!follow;
+  }
+
+  // HELPER METHODS
+  private async attachArticleRelations(articles: Article[]): Promise<ArticleWithAuthor[]> {
+    const result: ArticleWithAuthor[] = [];
+    
+    for (const article of articles) {
+      const [author] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, article.authorId));
+      
+      const tags = await this.getArticleTags(article.id);
+      
+      result.push({ ...article, author, tags });
+    }
+    
+    return result;
+  }
+
+  private async buildCommentTree(commentsData: Comment[]): Promise<CommentWithAuthor[]> {
+    // Get top-level comments
+    const topLevelComments = commentsData.filter(comment => !comment.parentId);
+    
+    // Build tree
+    const commentTree: CommentWithAuthor[] = [];
+    
+    for (const comment of topLevelComments) {
+      const [author] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, comment.authorId));
+      
+      const replies = await this.getCommentReplies(commentsData, comment.id);
+      
+      commentTree.push({ ...comment, author, replies });
+    }
+    
+    return commentTree;
+  }
+  
+  private async getCommentReplies(allComments: Comment[], parentId: number): Promise<CommentWithAuthor[]> {
+    const replies = allComments.filter(comment => comment.parentId === parentId);
+    const result: CommentWithAuthor[] = [];
+    
+    for (const reply of replies) {
+      const [author] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, reply.authorId));
+      
+      const nestedReplies = await this.getCommentReplies(allComments, reply.id);
+      
+      result.push({ ...reply, author, replies: nestedReplies });
+    }
+    
+    return result;
+  }
+}
+
+// Use DatabaseStorage instead of MemStorage
+export const storage = new DatabaseStorage();

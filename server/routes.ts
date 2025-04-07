@@ -1,39 +1,23 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import session from "express-session";
-import MemoryStore from "memorystore";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { 
-  insertUserSchema,
   insertArticleSchema,
   insertCommentSchema,
   insertTagSchema,
   insertBookmarkSchema,
   insertFollowSchema,
-  insertArticleTagSchema
+  insertArticleTagSchema,
+  comments
 } from "@shared/schema";
 import { z } from "zod";
-import { ZodError } from "zod-validation-error";
-
-// Initialize session store
-const MemoryStoreSession = MemoryStore(session);
+import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Configure session middleware
-  app.use(
-    session({
-      cookie: {
-        maxAge: 86400000, // 24 hours
-        secure: process.env.NODE_ENV === "production",
-      },
-      secret: process.env.SESSION_SECRET || "logus-secret",
-      resave: false,
-      saveUninitialized: false,
-      store: new MemoryStoreSession({
-        checkPeriod: 86400000, // prune expired entries every 24h
-      }),
-    })
-  );
+  // Set up authentication with Passport.js
+  setupAuth(app);
 
   // ===== Middleware Functions =====
   
@@ -57,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Ensure user is authenticated
   const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.userId) {
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
     next();
@@ -65,11 +49,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Ensure user has admin role
   const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.userId) {
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
     
-    const user = await storage.getUser(req.session.userId);
+    const user = req.user;
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
       return res.status(403).json({ message: "Admin privileges required" });
     }
@@ -79,11 +63,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Ensure user has superadmin role
   const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.userId) {
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
     
-    const user = await storage.getUser(req.session.userId);
+    const user = req.user;
     if (!user || user.role !== "superadmin") {
       return res.status(403).json({ message: "Superadmin privileges required" });
     }
@@ -93,118 +77,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Ensure user has blogger role or higher
   const requireBloggerOrHigher = async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.userId) {
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
     
-    const user = await storage.getUser(req.session.userId);
+    const user = req.user;
     if (!user || (user.role !== "blogger" && user.role !== "admin" && user.role !== "superadmin")) {
       return res.status(403).json({ message: "Blogger privileges required" });
     }
     
     next();
   };
-
-  // ===== API Routes =====
-  // All routes are prefixed with /api
-
-  // ----- Auth Routes -----
-  
-  // Register a new user
-  app.post(
-    "/api/auth/register",
-    validateRequest(insertUserSchema),
-    async (req, res) => {
-      try {
-        const { username, password, email, name } = req.body;
-
-        // Check if user already exists
-        const existingUser = await storage.getUserByUsername(username);
-        if (existingUser) {
-          return res.status(400).json({ message: "Username already taken" });
-        }
-
-        // Create the user
-        const user = await storage.createUser({
-          username,
-          password, // In a real app, you would hash this password
-          email,
-          name,
-          bio: "",
-          avatar: "",
-        });
-
-        // Save user id to session
-        req.session.userId = user.id;
-
-        // Return user data (excluding password)
-        const { password: _, ...userWithoutPassword } = user;
-        return res.status(201).json(userWithoutPassword);
-      } catch (error) {
-        console.error("Register error:", error);
-        return res.status(500).json({ message: "Server error" });
-      }
-    }
-  );
-
-  // Login
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-
-      // Find the user
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      // Check password (in a real app, you would compare hashed passwords)
-      if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      // Save user id to session
-      req.session.userId = user.id;
-
-      // Return user data (excluding password)
-      const { password: _, ...userWithoutPassword } = user;
-      return res.status(200).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Login error:", error);
-      return res.status(500).json({ message: "Server error" });
-    }
-  });
-
-  // Logout
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Failed to logout" });
-      }
-      return res.status(200).json({ message: "Logged out successfully" });
-    });
-  });
-
-  // Get current user
-  app.get("/api/auth/me", async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const user = await storage.getUser(req.session.userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Return user data (excluding password)
-      const { password, ...userWithoutPassword } = user;
-      return res.status(200).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Get current user error:", error);
-      return res.status(500).json({ message: "Server error" });
-    }
-  });
 
   // ----- User Routes -----
   
@@ -247,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const followingId = parseInt(req.params.id);
-        const followerId = req.session.userId!;
+        const followerId = req.user!.id;
         
         // Can't follow yourself
         if (followerId === followingId) {
@@ -271,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/users/:id/follow", requireAuth, async (req, res) => {
     try {
       const followingId = parseInt(req.params.id);
-      const followerId = req.session.userId!;
+      const followerId = req.user!.id;
       
       const success = await storage.unfollowUser(followerId, followingId);
       
@@ -290,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:id/following", requireAuth, async (req, res) => {
     try {
       const followingId = parseInt(req.params.id);
-      const followerId = req.session.userId!;
+      const followerId = req.user!.id;
       
       const isFollowing = await storage.isFollowing(followerId, followingId);
       
@@ -403,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     validateRequest(insertArticleSchema),
     async (req, res) => {
       try {
-        const authorId = req.session.userId!;
+        const authorId = req.user!.id;
         
         const article = await storage.createArticle({
           ...req.body,
@@ -425,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const articleId = parseInt(req.params.id);
-        const userId = req.session.userId!;
+        const userId = req.user!.id;
         
         // Get the article
         const article = await storage.getArticleById(articleId);
@@ -454,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/articles/:id", requireAuth, async (req, res) => {
     try {
       const articleId = parseInt(req.params.id);
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       
       // Get the article
       const article = await storage.getArticleById(articleId);
@@ -540,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const articleId = parseInt(req.params.articleId);
         const { tagId } = req.body;
-        const userId = req.session.userId!;
+        const userId = req.user!.id;
         
         // Get the article
         const article = await storage.getArticleById(articleId);
@@ -576,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const articleId = parseInt(req.params.articleId);
       const tagId = parseInt(req.params.tagId);
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       
       // Get the article
       const article = await storage.getArticleById(articleId);
@@ -633,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const articleId = parseInt(req.params.articleId);
-        const authorId = req.session.userId!;
+        const authorId = req.user!.id;
         const { content, parentId } = req.body;
         
         // Check if article exists
@@ -644,7 +527,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // If parentId is provided, check if parent comment exists
         if (parentId) {
-          const parentComment = await storage.commentsData.get(parentId);
+          // Get parent comment from DB
+          const commentResults = await db.select().from(comments).where(eq(comments.id, parentId));
+          const parentComment = commentResults[0];
           if (!parentComment) {
             return res.status(404).json({ message: "Parent comment not found" });
           }
@@ -674,10 +559,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/comments/:id", requireAuth, async (req, res) => {
     try {
       const commentId = parseInt(req.params.id);
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       
-      // Get the comment
-      const comment = await storage.commentsData.get(commentId);
+      // Get the comment from DB
+      const commentResult = await db.select().from(comments).where(eq(comments.id, commentId));
+      const comment = commentResult[0];
       
       if (!comment) {
         return res.status(404).json({ message: "Comment not found" });
@@ -707,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's bookmarks
   app.get("/api/bookmarks", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const bookmarks = await storage.getUserBookmarks(userId);
       return res.status(200).json(bookmarks);
     } catch (error) {
@@ -723,7 +609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     validateRequest(insertBookmarkSchema),
     async (req, res) => {
       try {
-        const userId = req.session.userId!;
+        const userId = req.user!.id;
         const { articleId } = req.body;
         
         // Check if article exists
@@ -748,7 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Remove bookmark
   app.delete("/api/bookmarks/:articleId", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const articleId = parseInt(req.params.articleId);
       
       const success = await storage.removeBookmark(userId, articleId);
@@ -767,7 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check if article is bookmarked
   app.get("/api/bookmarks/:articleId", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const articleId = parseInt(req.params.articleId);
       
       const isBookmarked = await storage.isBookmarked(userId, articleId);
