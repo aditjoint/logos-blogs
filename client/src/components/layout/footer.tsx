@@ -77,6 +77,23 @@ export default function Footer() {
             &copy; 2023 Logos. All rights reserved.
           </p>
         </div>
+        
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-900 dark:text-white mb-3">
+            Disclaimer
+          </h4>
+          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-2">
+            <p>
+              This website serves as a platform for the expression of thoughts, ideas, and personal reflections. All content posted is intended purely for the purpose of sharing perspectives in a respectful and constructive manner. The views expressed on this site are those of the individual contributors and do not reflect any form of prejudice, bias, or analysis.
+            </p>
+            <p>
+              Readers engage with the content at their own discretion and risk. The website and its owners do not accept responsibility for any consequences resulting from the interpretation or use of the content, including but not limited to social, political, economic, cultural, or financial implications. Users are also advised that this platform does not permit any claims or liabilities arising from the content shared or the interactions within the site.
+            </p>
+            <p>
+              By using this website, you acknowledge that the site does not make any representations or guarantees regarding the accuracy, completeness, or reliability of the information posted, and that all users are responsible for their own judgments.
+            </p>
+          </div>
+        </div>
       </div>
     </footer>
   );
